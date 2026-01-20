@@ -1,19 +1,24 @@
-body {
+html, body {
     margin:0;
-    overflow:hidden;
+    padding:0;
     background:black;
+    height:100%;
+    overscroll-behavior:none;
     touch-action:none;
 }
-#cam {
-    position:fixed;
-    bottom:10px;
-    right:10px;
-    width:180px;
-    opacity:0.15;
-    pointer-events:none;
-}
+
 #three {
     width:100vw;
     height:100vh;
     display:block;
+}
+
+#cam {
+    position:fixed;
+    bottom:8px;
+    right:8px;
+    width:160px;
+    opacity:0.18;
+    border-radius:10px;
+    pointer-events:none;
 }
