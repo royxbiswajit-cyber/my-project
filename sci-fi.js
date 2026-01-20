@@ -2,26 +2,32 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.m
 
 export function createSciFiWorld(scene) {
 
-    // Grid ground
+    // Neon Grid Ground
     const grid = new THREE.GridHelper(50, 100, 0x00ffff, 0x003355);
     grid.position.y = -2;
     scene.add(grid);
 
-    // Earth sphere
+    // Earth hologram
     const earth = new THREE.Mesh(
         new THREE.SphereGeometry(1, 32, 32),
         new THREE.MeshBasicMaterial({ wireframe: true, color: 0x00ffff })
     );
     scene.add(earth);
 
-    // Rings
-    const ring = new THREE.Mesh(
+    // Rotating Rings
+    const ring1 = new THREE.Mesh(
         new THREE.TorusGeometry(1.4, 0.02, 16, 128),
         new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true })
     );
-    scene.add(ring);
+    scene.add(ring1);
 
-    // Name tag
+    const ring2 = new THREE.Mesh(
+        new THREE.TorusGeometry(1.8, 0.02, 16, 128),
+        new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true })
+    );
+    scene.add(ring2);
+
+    // Name: BISWAJIT RO
     const loader = new THREE.FontLoader();
     loader.load("https://threejs.org/examples/fonts/helvetiker_regular.typeface.json", font => {
         const text = new THREE.Mesh(
@@ -32,5 +38,13 @@ export function createSciFiWorld(scene) {
         scene.add(text);
     });
 
-    return { earth, ring };
+    // Wireframe Face
+    const face = new THREE.Mesh(
+        new THREE.SphereGeometry(0.5, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true })
+    );
+    face.position.set(2, 0, 0);
+    scene.add(face);
+
+    return { earth, ring1, ring2, face };
 }
