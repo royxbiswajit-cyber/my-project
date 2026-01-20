@@ -1,107 +1,114 @@
 const video = document.getElementById("cam");
+const canvas3D = document.getElementById("three");
 
-navigator.mediaDevices.getUserMedia({video:true}).then(stream=>{
+async function startCamera() {
+    const stream = await navigator.mediaDevices.getUserMedia({ video:true });
     video.srcObject = stream;
+}
+startCamera();
+
+/* THREEJS INIT */
+const renderer = new THREE.WebGLRenderer({
+    canvas: canvas3D,
+    antialias: true
 });
 
-/* THREE INIT */
-const renderer = new THREE.WebGLRenderer({canvas: document.getElementById('three'), antialias:true});
-renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
-const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
-camera.position.set(0,2,7);
+const camera3D = new THREE.PerspectiveCamera(
+    60,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+);
+camera3D.position.set(0, 2, 7);
 
-/* LIGHT */
-const light = new THREE.PointLight(0x00ccff, 3, 100);
-light.position.set(0,2,5);
-scene.add(light);
+scene.add(new THREE.AmbientLight(0x00ffff, 0.4));
+scene.add(new THREE.PointLight(0x00ccff, 2));
 
-/* HOLOGRAM EARTH */
-const earthGeo = new THREE.SphereGeometry(2, 32, 32);
-const earthMat = new THREE.MeshBasicMaterial({
-    wireframe:true,
-    color:0x00ccff
-});
-const earth = new THREE.Mesh(earthGeo, earthMat);
+/* EARTH */
+const earth = new THREE.Mesh(
+    new THREE.SphereGeometry(2, 48, 48),
+    new THREE.MeshBasicMaterial({wireframe:true, color:0x00ccff})
+);
 scene.add(earth);
 
 /* RINGS */
-function ring(radius, speed){
-    const geo = new THREE.RingGeometry(radius, radius+0.02, 128);
-    const mat = new THREE.MeshBasicMaterial({
-        color:0x00ccff,
-        side:THREE.DoubleSide,
-        wireframe:true
-    });
-    const m = new THREE.Mesh(geo,mat);
-    m.rotation.x = Math.PI/2;
-    m.userData.speed = speed;
+function ring(r, s){
+    const m = new THREE.Mesh(
+        new THREE.RingGeometry(r, r+0.03, 128),
+        new THREE.MeshBasicMaterial({color:0x00ccff, wireframe:true, side:THREE.DoubleSide})
+    );
+    m.rotation.x = Math.PI / 2;
+    m.userData.speed = s;
     return m;
 }
+const r1 = ring(2.6, 0.01);
+const r2 = ring(3.2, 0.02);
+scene.add(r1, r2);
 
-const ring1 = ring(2.6,0.01);
-const ring2 = ring(3.2,0.02);
-scene.add(ring1, ring2);
-
-/* TEXT — BISWAJIT RO */
+/* NAME TEXT */
 const loader = new THREE.FontLoader();
-loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',font=>{
-    const geo = new THREE.TextGeometry('BISWAJIT RO',{
-        font:font,
-        size:0.35,
-        height:0.01
-    });
-    const mat = new THREE.MeshBasicMaterial({color:0x00ccff});
-    const text = new THREE.Mesh(geo,mat);
-    text.position.set(-1.7,0,0);
-    scene.add(text);
-});
+loader.load(
+    "https://threejs.org/examples/fonts/helvetiker_regular.typeface.json",
+    font => {
+        const t = new THREE.Mesh(
+            new THREE.TextGeometry("BISWAJIT RO", {font, size:0.35, height:0.005}),
+            new THREE.MeshBasicMaterial({color:0x00ccff})
+        );
+        t.position.set(-1.7, 0, 0);
+        scene.add(t);
+    }
+);
 
-/* HAND TRACK */
+/* HAND INPUT */
 let hx=0, hy=0, hz=0;
-
 const hands = new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-hands.setOptions({maxNumHands:1,modelComplexity:1});
-hands.onResults(res=>{
-    if(!res.multiHandLandmarks) return;
-    const p=res.multiHandLandmarks[0][9];
+hands.setOptions({maxNumHands:1, modelComplexity:1});
+
+hands.onResults(r=>{
+    if(!r.multiHandLandmarks) return;
+    const p = r.multiHandLandmarks[0][9];
     hx = (p.x-0.5)*2;
     hy = (p.y-0.5)*2;
     hz = p.z;
 });
-const cam1 = new Camera(video,{onFrame:async()=>{await hands.send({image:video});}});
-cam1.start();
 
-/* FACE WIREFRAME */
+let handsReady=false;
+const camH = new Camera(video,{onFrame:async()=>{
+    await hands.send({image:video});
+    handsReady=true;
+}});
+camH.start();
+
+/* FACE MESH */
 const face = new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
 face.setOptions({maxNumFaces:1});
-face.onResults(()=>{ /* hologram face projection here */ });
-const cam2 = new Camera(video,{onFrame:async()=>{await face.send({image:video});}});
-cam2.start();
 
 /* LOOP */
-function loop(){
-    requestAnimationFrame(loop);
+function tick(){
+    requestAnimationFrame(tick);
 
-    earth.rotation.y += 0.002 + hx*0.02;
-    earth.rotation.x += hy*0.01;
+    if(handsReady){
+        earth.rotation.y += 0.003 + hx*0.02;
+        earth.rotation.x += hy*0.01;
+        r1.rotation.z += r1.userData.speed + hx*0.01;
+        r2.rotation.z -= r2.userData.speed + hy*0.01;
+        camera3D.position.z = 7 + hz*12;
+        camera3D.lookAt(0,0,0);
+    }
 
-    ring1.rotation.z += ring1.userData.speed + hx*0.01;
-    ring2.rotation.z -= ring2.userData.speed + hy*0.01;
-
-    camera.position.z = 7 + hz*10;
-    camera.lookAt(0,0,0);
-
-    renderer.render(scene,camera);
+    renderer.render(scene, camera3D);
 }
-loop();
+tick();
 
-window.onresize=()=>{
-    renderer.setSize(innerWidth,innerHeight);
-    camera.aspect=innerWidth/innerHeight;
-    camera.updateProjectionMatrix();
+window.onresize = ()=>{
+    renderer.setSize(innerWidth, innerHeight);
+    camera3D.aspect = innerWidth/innerHeight;
+    camera3D.updateProjectionMatrix();
 };
