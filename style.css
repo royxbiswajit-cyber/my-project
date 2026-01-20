@@ -1,24 +1,16 @@
-html, body {
-    margin:0;
-    padding:0;
-    background:black;
-    height:100%;
-    overscroll-behavior:none;
-    touch-action:none;
+body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+    font-family: monospace;
+}
+
+video {
+    display: none;
 }
 
 #three {
-    width:100vw;
-    height:100vh;
-    display:block;
-}
-
-#cam {
-    position:fixed;
-    bottom:8px;
-    right:8px;
-    width:160px;
-    opacity:0.18;
-    border-radius:10px;
-    pointer-events:none;
+    position: fixed;
+    top: 0;
+    left: 0;
 }
