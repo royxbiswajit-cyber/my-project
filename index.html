@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced 3D Particle System | Hand Gesture Controlled</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+        }
+    }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+
+        #app {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
+            top: 0;
+            left: 0;
+        }
+
+        #webcam-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            height: 240px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            z-index: 100;
+            background: #111;
+            display: none;
+        }
+
+        #webcam-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(100, 255, 218, 0.3);
+            border-top-color: #64ffda;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        .loading-text {
+            font-size: 18px;
+            color: #64ffda;
+            margin-bottom: 8px;
+        }
+
+        .loading-subtext {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            text-align: center;
+            max-width: 400px;
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .ui-panel {
+            position: absolute;
+            background: rgba(10, 15, 20, 0.85);
+            backdrop-filter: blur(10px) saturate(180%);
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            border-radius: 16px;
+            padding: 24px;
+            pointer-events: all;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .ui-panel:hover {
+            border-color: rgba(100, 255, 218, 0.4);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        }
+
+        #control-panel {
+            top: 24px;
+            left: 24px;
+            width: 320px;
+        }
+
+        #gesture-panel {
+            bottom: 24px;
+            right: 24px;
+            width: 380px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .panel-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            color: #64ffda;
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .control-group {
+            margin-bottom: 24px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .control-value {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            color: #64ffda;
+            background: rgba(100, 255, 218, 0.1);
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .slider-container {
+            position: relative;
+            margin-top: 8px;
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+            transition: all 0.3s;
+        }
+
+        .slider:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #64ffda;
+            cursor: pointer;
+            box-shadow: 0 0 0 4px rgba(100, 255, 218, 0.2),
+                        0 4px 12px rgba(100, 255, 218, 0.4);
+            transition: all 0.2s;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 6px rgba(100, 255, 218, 0.3),
+                        0 6px 16px rgba(100, 255, 218, 0.5);
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            text-align: center;
+            user-select: none;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(100, 255, 218, 0.3);
+            color: #fff;
+            transform: translateY(-2px);
+        }
+
+        .btn.active {
+            background: linear-gradient(135deg, #64ffda, #00bcd4);
+            border-color: transparent;
+            color: #000;
+            font-weight: 600;
+            box-shadow: 0 4px 20px rgba(100, 255, 218, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .gesture-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .gesture-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s;
+        }
+
+        .gesture-item.active {
+            background: rgba(100, 255, 218, 0.1);
+            border-color: rgba(100, 255, 218, 0.3);
+            transform: translateY(-4px);
+        }
+
+        .gesture-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .gesture-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+            text-align: center;
+        }
+
+        .gesture-desc {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            text-align: center;
+            margin-top: 4px;
+        }
+
+        .status-bar {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(10, 15, 20, 0.9);
+            padding: 12px 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .status-indicator.active {
+            background: #4CAF50;
+            box-shadow: 0 0 12px #4CAF50;
+        }
+
+        .status-indicator.inactive {
+            background: #ff4444;
+            box-shadow: 0 0 12px #ff4444;
+        }
+
+        .status-text {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        #performance {
+            position: absolute;
+            bottom: 24px;
+            left: 24px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 15, 20, 0.9);
+            padding: 16px 24px;
+            border-radius: 12px;
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            backdrop-filter: blur(10px);
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .instructions-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #64ffda;
+            margin-bottom: 8px;
+        }
+
+        .instructions-text {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.5;
+        }
+
+        .highlight {
+            color: #64ffda;
+            font-weight: 600;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @media (max-width: 1024px) {
+            #control-panel, #gesture-panel {
+                width: 300px;
+            }
+            
+            .btn-group {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            #control-panel {
+                top: 12px;
+                left: 12px;
+                width: calc(100% - 24px);
+            }
+            
+            #gesture-panel {
+                top: 160px;
+                bottom: auto;
+                right: 12px;
+                width: calc(100% - 24px);
+            }
+            
+            #performance, #instructions {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="webcam-container">
+            <video id="webcam-feed" autoplay playsinline></video>
+        </div>
+        
+        <div id="ui">
+            <div id="control-panel" class="ui-panel">
+                <div class="panel-header">
+                    <div class="panel-icon">✨</div>
+                    <div class="panel-title">Particle Controls</div>
+                </div>
+                
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Particle Template</span>
+                        <span id="template-value" class="control-value">Hearts</span>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn active" data-template="hearts">❤️ Hearts</button>
+                        <button class="btn" data-template="flowers">🌺 Flowers</button>
+                        <button class="btn" data-template="saturn">🪐 Saturn</button>
+                        <button class="btn" data-template="fireworks">🎆 Fireworks</button>
+                        <button class="btn" data-template="stars">⭐ Stars</button>
+                        <button class="btn" data-template="bubbles">🌀 Bubbles</button>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Expansion</span>
+                        <span id="expansion-value" class="control-value">1.0x</span>
+                    </div>
+                    <div class="slider-container">
+                        <input type="range" class="slider" id="expansion-slider" min="0.1" max="3.0" step="0.1" value="1.0">
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Particle Speed</span>
+                        <span id="speed-value" class="control-value">1.0x</span>
+                    </div>
+                    <div class="slider-container">
+                        <input type="range" class="slider" id="speed-slider" min="0.1" max="2.0" step="0.1" value="1.0">
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Color Scheme</span>
+                        <span id="color-value" class="control-value">Rainbow</span>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn active" data-color="rainbow">🌈 Rainbow</button>
+                        <button class="btn" data-color="ocean">🌊 Ocean</button>
+                        <button class="btn" data-color="fire">🔥 Fire</button>
+                        <button class="btn" data-color="forest">🌳 Forest</button>
+                        <button class="btn" data-color="neon">💫 Neon</button>
+                        <button class="btn" data-color="monochrome">⚫ Mono</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="gesture-panel" class="ui-panel">
+                <div class="panel-header">
+                    <div class="panel-icon">👋</div>
+                    <div class="panel-title">Hand Gesture Control</div>
+                </div>
+                
+                <div class="gesture-display">
+                    <div class="gesture-item" data-gesture="open">
+                        <div class="gesture-icon">👋</div>
+                        <div class="gesture-name">Open Hand</div>
+                        <div class="gesture-desc">Expand particles</div>
+                    </div>
+                    <div class="gesture-item" data-gesture="fist">
+                        <div class="gesture-icon">✊</div>
+                        <div class="gesture-name">Fist</div>
+                        <div class="gesture-desc">Contract particles</div>
+                    </div>
+                    <div class="gesture-item" data-gesture="peace">
+                        <div class="gesture-icon">✌️</div>
+                        <div class="gesture-name">Peace Sign</div>
+                        <div class="gesture-desc">Change colors</div>
+                    </div>
+                    <div class="gesture-item" data-gesture="thumbs_up">
+                        <div class="gesture-icon">👍</div>
+                        <div class="gesture-name">Thumbs Up</div>
+                        <div class="gesture-desc">Speed up</div>
+                    </div>
+                    <div class="gesture-item" data-gesture="thumbs_down">
+                        <div class="gesture-icon">👎</div>
+                        <div class="gesture-name">Thumbs Down</div>
+                        <div class="gesture-desc">Slow down</div>
+                    </div>
+                    <div class="gesture-item" data-gesture="rock">
+                        <div class="gesture-icon">🤘</div>
+                        <div class="gesture-name">Rock On</div>
+                        <div class="gesture-desc">Switch template</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="status-bar">
+                <div class="status-item">
+                    <div class="status-indicator active" id="camera-status"></div>
+                    <div class="status-text">Camera: <span id="camera-text">Active</span></div>
+                </div>
+                <div class="status-item">
+                    <div class="status-indicator active" id="hand-status"></div>
+                    <div class="status-text">Hand Tracking: <span id="hand-text">Active</span></div>
+                </div>
+                <div class="status-item">
+                    <div class="status-indicator active" id="performance-status"></div>
+                    <div class="status-text">Performance: <span id="performance-text">Optimal</span></div>
+                </div>
+            </div>
+            
+            <div id="performance">
+                <div>FPS: <span id="fps-counter">60</span></div>
+                <div>Particles: <span id="particle-count">0</span></div>
+                <div>Memory: <span id="memory-usage">0 MB</span></div>
+            </div>
+            
+            <div id="instructions">
+                <div class="instructions-title">Gesture Controls</div>
+                <div class="instructions-text">
+                    Show your hand to the camera. Use <span class="highlight">open hand</span> to expand particles,
+                    <span class="highlight">fist</span> to contract, <span class="highlight">peace sign</span> to change colors,
+                    <span class="highlight">thumbs up/down</span> to control speed, and <span class="highlight">rock gesture</span> to switch templates.
+                </div>
+            </div>
+        </div>
+        
+        <div id="loading">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Initializing Particle System</div>
+            <div class="loading-subtext">
+                Loading 3D engine and hand tracking model...<br>
+                Please allow camera access when prompted
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { FilmPass } from 'three/addons/postprocessing/FilmPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        import { GammaCorrectionShader } from 'three/addons/shaders/GammaCorrectionShader.js';
+
+        class ParticleSystem {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.composer = null;
+                this.particles = [];
+                this.particleGroup = null;
+                this.clock = new THREE.Clock();
+                
+                this.params = {
+                    template: 'hearts',
+                    expansion: 1.0,
+                    speed: 1.0,
+                    colorScheme: 'rainbow',
+                    particleCount: 1000,
+                    handTracking: true
+                };
+                
+                this.hands = {
+                    detector: null,
+                    video: null,
+                    currentGesture: 'none',
+                    confidence: 0,
+                    lastGestureTime: 0,
+                    gestures: [
+                        'open', 'fist', 'peace', 'thumbs_up', 'thumbs_down', 'rock'
+                    ]
+                };
+                
+                this.performance = {
+                    fps: 60,
+                    frameTime: 0,
+                    memory: 0,
+                    particleCount: 0,
+                    lastUpdate: 0
+                };
+                
+                this.init();
+            }
+            
+            async init() {
+                await this.initThreeJS();
+                await this.initHandTracking();
+                this.initUI();
+                this.initParticles();
+                this.initPostProcessing();
+                this.animate();
+                
+                // Hide loading screen
+                setTimeout(() => {
+                    document.getElementById('loading').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('loading').style.display = 'none';
+                    }, 500);
+                }, 1500);
+            }
+            
+            async initThreeJS() {
+                // Scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x000011);
+                this.scene.fog = new THREE.FogExp2(0x000022, 0.02);
+                
+                // Camera
+                this.camera = new THREE.PerspectiveCamera(
+                    75,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    1000
+                );
+                this.camera.position.set(0, 0, 30);
+                
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({
+                    antialias: true,
+                    alpha: true,
+                    powerPreference: 'high-performance',
+                    precision: 'highp'
+                });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.0;
+                
+                document.getElementById('app').appendChild(this.renderer.domElement);
+                
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+                directionalLight.position.set(10, 20, 15);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                this.scene.add(directionalLight);
+                
+                // Point lights for ambiance
+                const colors = [0xff0080, 0x8000ff, 0x00ff80];
+                colors.forEach((color, i) => {
+                    const light = new THREE.PointLight(color, 2, 50);
+                    const angle = (i / colors.length) * Math.PI * 2;
+                    light.position.set(
+                        Math.cos(angle) * 20,
+                        Math.sin(angle) * 10,
+                        Math.sin(angle) * 15
+                    );
+                    this.scene.add(light);
+                });
+                
+                // Window resize handler
+                window.addEventListener('resize', this.onWindowResize.bind(this));
+            }
+            
+            initPostProcessing() {
+                this.composer = new EffectComposer(this.renderer);
+                
+                const renderPass = new RenderPass(this.scene, this.camera);
+                this.composer.addPass(renderPass);
+                
+                // Bloom effect
+                const bloomPass = new UnrealBloomPass(
+                    new THREE.Vector2(window.innerWidth, window.innerHeight),
+                    1.5, // strength
+                    0.4, // radius
+                    0.85 // threshold
+                );
+                this.composer.addPass(bloomPass);
+                
+                // Film grain
+                const filmPass = new FilmPass(0.1, 0.5, 648, false);
+                this.composer.addPass(filmPass);
+                
+                // Gamma correction
+                const gammaPass = new ShaderPass(GammaCorrectionShader);
+                this.composer.addPass(gammaPass);
+            }
+            
+            async initHandTracking() {
+                try {
+                    // Request camera access
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            width: { ideal: 640 },
+                            height: { ideal: 480 },
+                            facingMode: 'user'
+                        }
+                    });
+                    
+                    // Setup video element
+                    const video = document.getElementById('webcam-feed');
+                    video.srcObject = stream;
+                    
+                    // Show webcam container
+                    document.getElementById('webcam-container').style.display = 'block';
+                    
+                    // Update status
+                    document.getElementById('camera-status').className = 'status-indicator active';
+                    document.getElementById('camera-text').textContent = 'Active';
+                    
+                    // Initialize hand tracking (simulated for this example)
+                    // In production, integrate with MediaPipe Hands or TensorFlow.js HandPose
+                    this.setupMockHandTracking();
+                    
+                } catch (error) {
+                    console.warn('Camera access denied, using mouse simulation:', error);
+                    this.params.handTracking = false;
+                    this.setupMouseControls();
+                    
+                    document.getElementById('camera-status').className = 'status-indicator inactive';
+                    document.getElementById('camera-text').textContent = 'Simulated';
+                }
+            }
+            
+            setupMockHandTracking() {
+                // Simulate hand tracking for demo purposes
+                // In a real implementation, you would use:
+                // 1. MediaPipe Hands: https://google.github.io/mediapipe/solutions/hands.html
+                // 2. TensorFlow.js HandPose: https://github.com/tensorflow/tfjs-models/tree/master/hand-pose-detection
+                
+                let mockGestureIndex = 0;
+                let lastGestureChange = 0;
+                
+                const simulateGesture = () => {
+                    const now = Date.now();
+                    if (now - lastGestureChange > 3000) {
+                        mockGestureIndex = (mockGestureIndex + 1) % this.hands.gestures.length;
+                        this.hands.currentGesture = this.hands.gestures[mockGestureIndex];
+                        this.hands.confidence = 0.8 + Math.random() * 0.2;
+                        this.hands.lastGestureTime = now;
+                        lastGestureChange = now;
+                        
+                        this.updateGestureUI();
+                        this.applyGestureEffect();
+                    }
+                };
+                
+                // Update hand status
+                document.getElementById('hand-status').className = 'status-indicator active';
+                document.getElementById('hand-text').textContent = 'Simulated';
+                
+                // Start simulation
+                setInterval(simulateGesture, 100);
+            }
+            
+            setupMouseControls() {
+                let mouseX = 0;
+                let mouseY = 0;
+                
+                document.addEventListener('mousemove', (e) => {
+                    mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+                    
+                    // Simulate gestures based on mouse position and buttons
+                    if (e.buttons & 1) { // Left click
+                        this.hands.currentGesture = 'fist';
+                    } else if (e.buttons & 2) { // Right click
+                        this.hands.currentGesture = 'open';
+                    } else if (e.buttons & 4) { // Middle click
+                        this.hands.currentGesture = 'peace';
+                    } else {
+                        // Map mouse position to gestures
+                        if (mouseY > 0.5) this.hands.currentGesture = 'thumbs_up';
+                        else if (mouseY < -0.5) this.hands.currentGesture = 'thumbs_down';
+                        else if (mouseX > 0.5) this.hands.currentGesture = 'rock';
+                        else if (mouseX < -0.5) this.hands.currentGesture = 'peace';
+                        else this.hands.currentGesture = 'open';
+                    }
+                    
+                    this.updateGestureUI();
+                });
+            }
+            
+            initParticles() {
+                this.particleGroup = new THREE.Group();
+                this.scene.add(this.particleGroup);
+                
+                this.generateParticles();
+            }
+            
+            generateParticles() {
+                // Clear existing particles
+                this.particles.forEach(particle => {
+                    this.particleGroup.remove(particle.mesh);
+                    if (particle.mesh.geometry) particle.mesh.geometry.dispose();
+                    if (particle.mesh.material) particle.mesh.material.dispose();
+                });
+                this.particles = [];
+                
+                // Create new particles
+                for (let i = 0; i < this.params.particleCount; i++) {
+                    const particle = this.createParticle(i);
+                    this.particleGroup.add(particle.mesh);
+                    this.particles.push(particle);
+                }
+                
+                this.performance.particleCount = this.params.particleCount;
+            }
+            
+            createParticle(index) {
+                let geometry, material, mesh;
+                const size = 0.3 + Math.random() * 0.4;
+                
+                switch(this.params.template) {
+                    case 'hearts':
+                        geometry = this.createHeartGeometry(size);
+                        break;
+                    case 'flowers':
+                        geometry = this.createFlowerGeometry(size);
+                        break;
+                    case 'saturn':
+                        geometry = this.createSaturnGeometry(size);
+                        break;
+                    case 'fireworks':
+                        geometry = this.createFireworkGeometry(size);
+                        break;
+                    case 'stars':
+                        geometry = this.createStarGeometry(size);
+                        break;
+                    case 'bubbles':
+                        geometry = this.createBubbleGeometry(size);
+                        break;
+                }
+                
+                // Create material based on color scheme
+                material = this.createMaterial(index);
+                
+                mesh = new THREE.Mesh(geometry, material);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                // Initial position in a spherical distribution
+                const radius = 5 + Math.random() * 15;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                
+                mesh.position.set(
+                    radius * Math.sin(phi) * Math.cos(theta),
+                    radius * Math.sin(phi) * Math.sin(theta),
+                    radius * Math.cos(phi)
+                );
+                
+                return {
+                    mesh,
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.02,
+                        (Math.random() - 0.5) * 0.02,
+                        (Math.random() - 0.5) * 0.02
+                    ),
+                    basePosition: mesh.position.clone(),
+                    rotationSpeed: new THREE.Vector3(
+                        Math.random() * 0.02 - 0.01,
+                        Math.random() * 0.02 - 0.01,
+                        Math.random() * 0.02 - 0.01
+                    ),
+                    size,
+                    phase: Math.random() * Math.PI * 2,
+                    noiseOffset: Math.random() * 1000
+                };
+            }
+            
+            createHeartGeometry(size) {
+                const shape = new THREE.Shape();
+                shape.moveTo(0, 0);
+                shape.bezierCurveTo(0.5, 0.5, 1, 0, 0, -1);
+                shape.bezierCurveTo(-1, 0, -0.5, 0.5, 0, 0);
+                
+                const extrudeSettings = {
+                    depth: size * 0.2,
+                    bevelEnabled: true,
+                    bevelThickness: 0.1,
+                    bevelSize: 0.1,
+                    bevelSegments: 5
+                };
+                
+                const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+                geometry.scale(size, size, size);
+                geometry.rotateX(Math.PI);
+                return geometry;
+            }
+            
+            createFlowerGeometry(size) {
+                const petals = 6;
+                const points = [];
+                
+                for (let i = 0; i <= petals * 2; i++) {
+                    const angle = (i / petals) * Math.PI;
+                    const radius = i % 2 === 0 ? size : size * 0.5;
+                    points.push(
+                        new THREE.Vector3(
+                            Math.cos(angle) * radius,
+                            Math.sin(angle) * radius,
+                            0
+                        )
+                    );
+                }
+                
+                const shape = new THREE.Shape(points);
+                const extrudeSettings = {
+                    depth: size * 0.2,
+                    bevelEnabled: true,
+                    bevelThickness: 0.1,
+                    bevelSize: 0.1,
+                    bevelSegments: 3
+                };
+                
+                return new THREE.ExtrudeGeometry(shape, extrudeSettings);
+            }
+            
+            createSaturnGeometry(size) {
+                const group = new THREE.Group();
+                
+                // Planet
+                const planetGeometry = new THREE.IcosahedronGeometry(size, 2);
+                const planet = new THREE.Mesh(planetGeometry);
+                group.add(planet);
+                
+                // Rings
+                const ringGeometry = new THREE.RingGeometry(size * 1.2, size * 1.8, 32);
+                const ringMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffaa33,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.6
+                });
+                const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                ring.rotation.x = Math.PI / 2;
+                group.add(ring);
+                
+                return group;
+            }
+            
+            createFireworkGeometry(size) {
+                const group = new THREE.Group();
+                
+                // Central core
+                const coreGeometry = new THREE.SphereGeometry(size * 0.3, 8, 8);
+                const core = new THREE.Mesh(coreGeometry);
+                group.add(core);
+                
+                // Explosion rays
+                const rays = 12;
+                for (let i = 0; i < rays; i++) {
+                    const rayGeometry = new THREE.ConeGeometry(size * 0.1, size * 2, 4);
+                    const ray = new THREE.Mesh(rayGeometry);
+                    
+                    const angle = (i / rays) * Math.PI * 2;
+                    ray.position.set(
+                        Math.cos(angle) * size * 0.5,
+                        Math.sin(angle) * size * 0.5,
+                        0
+                    );
+                    ray.rotation.z = angle + Math.PI / 2;
+                    
+                    group.add(ray);
+                }
+                
+                return group;
+            }
+            
+            createStarGeometry(size) {
+                const shape = new THREE.Shape();
+                const points = 5;
+                const innerRadius = size * 0.5;
+                const outerRadius = size;
+                
+                for (let i = 0; i < points * 2; i++) {
+                    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                    const angle = (i / (points * 2)) * Math.PI * 2;
+                    
+                    const x = Math.cos(angle) * radius;
+                    const y = Math.sin(angle) * radius;
+                    
+                    if (i === 0) shape.moveTo(x, y);
+                    else shape.lineTo(x, y);
+                }
+                
+                shape.closePath();
+                const extrudeSettings = {
+                    depth: size * 0.3,
+                    bevelEnabled: true,
+                    bevelThickness: 0.1,
+                    bevelSize: 0.1,
+                    bevelSegments: 2
+                };
+                
+                return new THREE.ExtrudeGeometry(shape, extrudeSettings);
+            }
+            
+            createBubbleGeometry(size) {
+                return new THREE.SphereGeometry(size, 16, 16);
+            }
+            
+            createMaterial(index) {
+                let color;
+                const hue = (index / this.params.particleCount) * 360;
+                
+                switch(this.params.colorScheme) {
+                    case 'rainbow':
+                        color = new THREE.Color(`hsl(${hue}, 100%, 60%)`);
+                        break;
+                    case 'ocean':
+                        color = new THREE.Color(`hsl(${200 + Math.random() * 40}, 80%, 60%)`);
+                        break;
+                    case 'fire':
+                        color = new THREE.Color(`hsl(${20 + Math.random() * 30}, 100%, 60%)`);
+                        break;
+                    case 'forest':
+                        color = new THREE.Color(`hsl(${100 + Math.random() * 40}, 80%, 50%)`);
+                        break;
+                    case 'neon':
+                        const hues = [300, 180, 60];
+                        color = new THREE.Color(`hsl(${hues[Math.floor(Math.random() * hues.length)]}, 100%, 70%)`);
+                        break;
+                    case 'monochrome':
+                        const brightness = 0.5 + Math.random() * 0.3;
+                        color = new THREE.Color(brightness, brightness, brightness);
+                        break;
+                }
+                
+                return new THREE.MeshStandardMaterial({
+                    color: color,
+                    roughness: 0.3,
+                    metalness: 0.7,
+                    emissive: color.clone().multiplyScalar(0.2),
+                    emissiveIntensity: 0.5,
+                    transparent: true,
+                    opacity: 0.9,
+                    side: THREE.DoubleSide
+                });
+            }
+            
+            updateParticles(deltaTime) {
+                const time = this.clock.getElapsedTime();
+                const expansion = this.params.expansion;
+                const speed = this.params.speed;
+                
+                this.particles.forEach((particle, i) => {
+                    const mesh = particle.mesh;
+                    
+                    // Apply expansion with smooth scaling
+                    const scale = expansion * particle.size * 
+                        (1 + 0.2 * Math.sin(time * 2 + particle.phase));
+                    mesh.scale.setScalar(scale);
+                    
+                    // Apply floating motion with Perlin-like noise
+                    const noiseX = Math.sin(time * 0.5 + particle.noiseOffset) * 0.5;
+                    const noiseY = Math.cos(time * 0.7 + particle.noiseOffset * 1.1) * 0.5;
+                    const noiseZ = Math.sin(time * 0.6 + particle.noiseOffset * 0.9) * 0.5;
+                    
+                    mesh.position.x = particle.basePosition.x + noiseX;
+                    mesh.position.y = particle.basePosition.y + noiseY;
+                    mesh.position.z = particle.basePosition.z + noiseZ;
+                    
+                    // Update rotation
+                    mesh.rotation.x += particle.rotationSpeed.x * speed;
+                    mesh.rotation.y += particle.rotationSpeed.y * speed;
+                    mesh.rotation.z += particle.rotationSpeed.z * speed;
+                    
+                    // Move base position
+                    particle.basePosition.add(
+                        particle.velocity.clone().multiplyScalar(speed * deltaTime * 60)
+                    );
+                    
+                    // Keep within bounds with soft constraints
+                    const distance = particle.basePosition.length();
+                    if (distance > 25) {
+                        const force = particle.basePosition.clone().normalize().multiplyScalar(-0.01);
+                        particle.velocity.add(force);
+                        particle.velocity.multiplyScalar(0.95); // Damping
+                    }
+                    
+                    // Update material properties based on time
+                    if (mesh.material && mesh.material.emissive) {
+                        const pulse = 0.5 + 0.5 * Math.sin(time + i * 0.1);
+                        mesh.material.emissiveIntensity = 0.3 + pulse * 0.2;
+                    }
+                });
+                
+                // Rotate entire group
+                this.particleGroup.rotation.y += 0.001 * speed;
+                this.particleGroup.rotation.x += 0.0005 * speed;
+            }
+            
+            applyGestureEffect() {
+                const gesture = this.hands.currentGesture;
+                
+                switch(gesture) {
+                    case 'open':
+                        this.params.expansion = Math.min(this.params.expansion + 0.1, 3.0);
+                        break;
+                    case 'fist':
+                        this.params.expansion = Math.max(this.params.expansion - 0.1, 0.3);
+                        break;
+                    case 'peace':
+                        // Cycle through color schemes
+                        const schemes = ['rainbow', 'ocean', 'fire', 'forest', 'neon', 'monochrome'];
+                        const currentIndex = schemes.indexOf(this.params.colorScheme);
+                        const nextIndex = (currentIndex + 1) % schemes.length;
+                        this.params.colorScheme = schemes[nextIndex];
+                        this.updateParticleColors();
+                        break;
+                    case 'thumbs_up':
+                        this.params.speed = Math.min(this.params.speed + 0.1, 2.0);
+                        break;
+                    case 'thumbs_down':
+                        this.params.speed = Math.max(this.params.speed - 0.1, 0.1);
+                        break;
+                    case 'rock':
+                        // Cycle through templates
+                        const templates = ['hearts', 'flowers', 'saturn', 'fireworks', 'stars', 'bubbles'];
+                        const currentTemplateIndex = templates.indexOf(this.params.template);
+                        const nextTemplateIndex = (currentTemplateIndex + 1) % templates.length;
+                        this.params.template = templates[nextTemplateIndex];
+                        this.generateParticles();
+                        break;
+                }
+                
+                // Update UI sliders
+                document.getElementById('expansion-slider').value = this.params.expansion;
+                document.getElementById('expansion-value').textContent = `${this.params.expansion.toFixed(1)}x`;
+                document.getElementById('speed-slider').value = this.params.speed;
+                document.getElementById('speed-value').textContent = `${this.params.speed.toFixed(1)}x`;
+            }
+            
+            updateParticleColors() {
+                this.particles.forEach((particle, i) => {
+                    if (particle.mesh.material) {
+                        const newMaterial = this.createMaterial(i);
+                        particle.mesh.material.dispose();
+                        particle.mesh.material = newMaterial;
+                    }
+                });
+            }
+            
+            updateGestureUI() {
+                document.querySelectorAll('.gesture-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                const activeItem = document.querySelector(`[data-gesture="${this.hands.currentGesture}"]`);
+                if (activeItem) {
+                    activeItem.classList.add('active');
+                }
+            }
+            
+            initUI() {
+                // Template buttons
+                document.querySelectorAll('[data-template]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-template]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        
+                        this.params.template = e.target.dataset.template;
+                        document.getElementById('template-value').textContent = 
+                            e.target.textContent.replace('️', '').trim();
+                        
+                        this.generateParticles();
+                    });
+                });
+                
+                // Color buttons
+                document.querySelectorAll('[data-color]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-color]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        
+                        this.params.colorScheme = e.target.dataset.color;
+                        document.getElementById('color-value').textContent = 
+                            e.target.textContent.replace('️', '').trim();
+                        
+                        this.updateParticleColors();
+                    });
+                });
+                
+                // Sliders
+                document.getElementById('expansion-slider').addEventListener('input', (e) => {
+                    this.params.expansion = parseFloat(e.target.value);
+                    document.getElementById('expansion-value').textContent = 
+                        `${this.params.expansion.toFixed(1)}x`;
+                });
+                
+                document.getElementById('speed-slider').addEventListener('input', (e) => {
+                    this.params.speed = parseFloat(e.target.value);
+                    document.getElementById('speed-value').textContent = 
+                        `${this.params.speed.toFixed(1)}x`;
+                });
+                
+                // Performance monitoring
+                this.setupPerformanceMonitoring();
+            }
+            
+            setupPerformanceMonitoring() {
+                let frameCount = 0;
+                let lastTime = performance.now();
+                
+                const updatePerformance = () => {
+                    frameCount++;
+                    const currentTime = performance.now();
+                    
+                    if (currentTime >= lastTime + 1000) {
+                        this.performance.fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
+                        frameCount = 0;
+                        lastTime = currentTime;
+                        
+                        // Update UI
+                        document.getElementById('fps-counter').textContent = this.performance.fps;
+                        document.getElementById('particle-count').textContent = this.performance.particleCount;
+                        
+                        // Update performance status
+                        const statusEl = document.getElementById('performance-status');
+                        const textEl = document.getElementById('performance-text');
+                        
+                        if (this.performance.fps >= 50) {
+                            statusEl.className = 'status-indicator active';
+                            textEl.textContent = 'Optimal';
+                        } else if (this.performance.fps >= 30) {
+                            statusEl.className = 'status-indicator active';
+                            textEl.textContent = 'Good';
+                        } else {
+                            statusEl.className = 'status-indicator inactive';
+                            textEl.textContent = 'Slow';
+                        }
+                    }
+                    
+                    requestAnimationFrame(updatePerformance);
+                };
+                
+                updatePerformance();
+            }
+            
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.composer.setSize(window.innerWidth, window.innerHeight);
+            }
+            
+            animate() {
+                requestAnimationFrame(this.animate.bind(this));
+                
+                const deltaTime = this.clock.getDelta();
+                
+                // Update particles
+                this.updateParticles(deltaTime);
+                
+                // Render with post-processing
+                this.composer.render();
+                
+                // Apply gesture effects continuously
+                if (this.hands.currentGesture !== 'none' && 
+                    Date.now() - this.hands.lastGestureTime < 1000) {
+                    this.applyGestureEffect();
+                }
+            }
+        }
+        
+        // Initialize the application
+        const particleSystem = new ParticleSystem();
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            switch(e.key.toLowerCase()) {
+                case '1': document.querySelector('[data-template="hearts"]').click(); break;
+                case '2': document.querySelector('[data-template="flowers"]').click(); break;
+                case '3': document.querySelector('[data-template="saturn"]').click(); break;
+                case '4': document.querySelector('[data-template="fireworks"]').click(); break;
+                case '5': document.querySelector('[data-template="stars"]').click(); break;
+                case '6': document.querySelector('[data-template="bubbles"]').click(); break;
+                case 'q': document.querySelector('[data-color="rainbow"]').click(); break;
+                case 'w': document.querySelector('[data-color="ocean"]').click(); break;
+                case 'e': document.querySelector('[data-color="fire"]').click(); break;
+                case 'r': document.querySelector('[data-color="forest"]').click(); break;
+                case 't': document.querySelector('[data-color="neon"]').click(); break;
+                case 'y': document.querySelector('[data-color="monochrome"]').click(); break;
+                case ' ': 
+                    particleSystem.params.handTracking = !particleSystem.params.handTracking;
+                    const handStatus = document.getElementById('hand-status');
+                    const handText = document.getElementById('hand-text');
+                    if (particleSystem.params.handTracking) {
+                        handStatus.className = 'status-indicator active';
+                        handText.textContent = 'Active';
+                    } else {
+                        handStatus.className = 'status-indicator inactive';
+                        handText.textContent = 'Inactive';
+                    }
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
