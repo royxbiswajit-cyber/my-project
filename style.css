@@ -1,0 +1,19 @@
+body {
+    margin:0;
+    overflow:hidden;
+    background:black;
+    touch-action:none;
+}
+#cam {
+    position:fixed;
+    bottom:10px;
+    right:10px;
+    width:180px;
+    opacity:0.15;
+    pointer-events:none;
+}
+#three {
+    width:100vw;
+    height:100vh;
+    display:block;
+}
