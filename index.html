@@ -2,23 +2,20 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Gesture Control</title>
+    <title>Sci-Fi Hologram</title>
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-
-    <style>
-        body { margin: 0; overflow: hidden; }
-        video { display: none; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <video id="cam" autoplay playsinline></video>
 <canvas id="three"></canvas>
 
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
+<script type="module" src="sci-fi.js"></script>
 
 </body>
 </html>
