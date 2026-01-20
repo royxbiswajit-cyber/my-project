@@ -2,101 +2,100 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Hand Controlled Energy Ball</title>
+<title>Sci-Fi World</title>
 <style>
-    body {
-        margin:0;
-        background:#000;
-        overflow:hidden;
-    }
-    video {
-        display:none;
-    }
+  body{margin:0;background:#000;overflow:hidden;}
 </style>
 
 <script type="importmap">
 {
-  "imports": {
-    "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
-  }
+ "imports":{
+  "three":"https://unpkg.com/three@0.158.0/build/three.module.js",
+  "three/addons/":"https://unpkg.com/three@0.158.0/examples/jsm/"
+ }
 }
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 </head>
 <body>
 
-<video id="webcam" autoplay playsinline></video>
-
 <script type="module">
-import * as THREE from 'three';
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-let scene, camera3D, renderer, sphere;
-let targetPos = new THREE.Vector3();
-let smoothPos = new THREE.Vector3();
+const scene = new THREE.Scene();
 
-function init3D() {
-    scene = new THREE.Scene();
+// Camera
+const camera = new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,1000);
+camera.position.set(0,0,4);
 
-    camera3D = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 1000);
-    camera3D.position.z = 2;
+// Renderer
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
 
-    renderer = new THREE.WebGLRenderer({antialias:true});
-    renderer.setSize(innerWidth, innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    const glowMat = new THREE.MeshBasicMaterial({
-        color:0x64ffda,
-        transparent:true,
-        opacity:1
-    });
-
-    const geo = new THREE.SphereGeometry(0.05, 32, 32);
-    sphere = new THREE.Mesh(geo, glowMat);
-    scene.add(sphere);
+// Stars
+const starGeo = new THREE.BufferGeometry();
+const starCount = 1000;
+const positions = new Float32Array(starCount*3);
+for(let i=0;i<starCount;i++){
+ positions[i*3+0]=(Math.random()-0.5)*20;
+ positions[i*3+1]=(Math.random()-0.5)*20;
+ positions[i*3+2]=(Math.random()-0.5)*20;
 }
+starGeo.setAttribute("position", new THREE.BufferAttribute(positions,3));
+const starMat = new THREE.PointsMaterial({color:0xffffff,size:0.02});
+scene.add(new THREE.Points(starGeo,starMat));
 
-function animate() {
-    requestAnimationFrame(animate);
+// Wireframe head (sphere cheat)
+const geo = new THREE.SphereGeometry(1,32,32);
+const wire = new THREE.WireframeGeometry(geo);
+const line = new THREE.LineSegments(wire,new THREE.LineBasicMaterial({color:0xffffff}));
+scene.add(line);
 
-    // smooth follow
-    smoothPos.lerp(targetPos, 0.15);
-    sphere.position.copy(smoothPos);
+// Eyes glow
+const eyeMat = new THREE.MeshBasicMaterial({color:0x44ccff});
+const eyeGeo = new THREE.SphereGeometry(0.1,16,16);
+const eyeL = new THREE.Mesh(eyeGeo,eyeMat);
+const eyeR = new THREE.Mesh(eyeGeo,eyeMat);
+eyeL.position.set(-0.3,0,0.9);
+eyeR.position.set(0.3,0,0.9);
+scene.add(eyeL,eyeR);
 
-    renderer.render(scene, camera3D);
+// Name text
+const loader = new THREE.FontLoader();
+loader.load("https://threejs.org/examples/fonts/helvetiker_regular.typeface.json", font=>{
+ const textGeo = new THREE.TextGeometry("Biswajit Roy",{
+  font:font,
+  size:0.15,
+  height:0
+ });
+ const textMat = new THREE.MeshBasicMaterial({color:0x44ccff});
+ const textMesh = new THREE.Mesh(textGeo,textMat);
+ textMesh.position.set(-0.8,-1.4,0);
+ scene.add(textMesh);
+});
+
+// Controls
+const controls = new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;
+controls.dampingFactor=0.05;
+
+// Render loop
+function animate(){
+ requestAnimationFrame(animate);
+ line.rotation.y += 0.002;
+ eyeL.rotation.y += 0.002;
+ eyeR.rotation.y += 0.002;
+ controls.update();
+ renderer.render(scene,camera);
 }
-init3D();
 animate();
 
-// ===== Hand Tracking =====
-const video = document.getElementById('webcam');
-
-const hands = new Hands({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+window.addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
 });
-hands.setOptions({
-    maxNumHands: 1,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.6,
-    minTrackingConfidence: 0.5
-});
-
-hands.onResults(results => {
-    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const hand = results.multiHandLandmarks[0];
-        let x = hand[9].x;  // center of palm approx
-        let y = hand[9].y;
-        targetPos.set((x - 0.5)*2, (0.5 - y)*2, 0);
-    }
-});
-
-const cam = new Camera(video, {
-    onFrame: async () => { await hands.send({image: video}); },
-    width: 640,
-    height: 480
-});
-cam.start();
 </script>
 </body>
 </html>
